@@ -1,0 +1,41 @@
+use crate::beacon_api::BeaconApi;
+use crate::cli::{App, Command};
+use crate::config::get_config;
+use crate::distributor::Distributor;
+use clap::Parser;
+use tracing_subscriber::fmt::format::{FmtSpan, Format};
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
+
+mod beacon_api;
+mod cli;
+mod config;
+mod contract;
+mod distribute;
+mod distributor;
+mod types;
+
+#[tokio::main]
+async fn main() -> eyre::Result<()> {
+    let subscriber = FmtSubscriber::builder()
+        .with_env_filter(EnvFilter::from_default_env().add_directive("info".parse()?))
+        .event_format(Format::default())
+        .with_span_events(FmtSpan::NONE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    let _ = get_config(); // validates config
+
+    match App::parse().command {
+        Command::Distributor { fee_recipient, wss_url, beacon_url, keystore, password } => {
+            let ds =
+                Distributor::new(fee_recipient, wss_url, beacon_url, keystore, password).await?;
+            ds.run().await?;
+        }
+        Command::Beacon { beacon_url, timestamp } => {
+            let beacon_api = BeaconApi::new(beacon_url);
+            let result = beacon_api.get_block_proposer(timestamp).await?;
+            println!("{:#?}", result);
+        }
+    }
+
+    Ok(())
+}
