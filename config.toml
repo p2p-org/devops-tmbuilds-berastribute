@@ -1,3 +1,5 @@
+chain_id = 80000
+
 ## EL config
 distributor = "0x211bE45338B7C6d5721B5543Eb868547088Aca39"
 block_poll_interval = 100

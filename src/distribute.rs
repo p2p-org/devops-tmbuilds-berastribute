@@ -52,8 +52,8 @@ async fn distribute(
             resp.proposer_index_proof,
             resp.validator_pubkey_proof,
         )
-        .chain_id(80000)
-        .gas(700000)
+        .chain_id(cfg.chain_id)
+        .gas(1000000)
         .send()
         .await?;
     Ok(tx_hash.tx_hash().clone())

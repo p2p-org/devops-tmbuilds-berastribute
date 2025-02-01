@@ -4,14 +4,17 @@ use lazy_static::lazy_static;
 use std::sync::Arc;
 use std::time::Duration;
 
+const DEFAULT_CHAIN_ID: u64 = 80000;
 const DEFAULT_DISTRIBUTOR_ADDRESS: Address = address!("0x211bE45338B7C6d5721B5543Eb868547088Aca39");
 const DEFAULT_BLOCK_POLL_INTERVAL: u64 = 250;
 
 const DEFAULT_BEACON_POLL_INTERVAL: u64 = 250;
 const DEFAULT_BEACON_MAX_RETRIES: usize = 12;
 
+
 #[derive(Clone, Debug)]
 pub struct Config {
+    pub chain_id: u64,
     pub distributor: Address,
     pub block_poll_interval: Duration,
     pub beacon_poll_interval: Duration,
@@ -29,8 +32,10 @@ fn build_config() -> eyre::Result<Config> {
     );
     let beacon_max_retries =
         cfg.get::<usize>("beacon_max_retries").unwrap_or(DEFAULT_BEACON_MAX_RETRIES);
+    let chain_id =
+        cfg.get::<u64>("chain_id").unwrap_or(DEFAULT_CHAIN_ID);
 
-    Ok(Config { distributor, block_poll_interval, beacon_poll_interval, beacon_max_retries })
+    Ok(Config { distributor, block_poll_interval, beacon_poll_interval, beacon_max_retries, chain_id })
 }
 
 lazy_static! {
