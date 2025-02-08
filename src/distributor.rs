@@ -1,13 +1,13 @@
 use crate::beacon_api::BeaconApi;
+use crate::config::get_config;
 use crate::distribute::poll_proof_and_distribute;
 use crate::types::MyProvider;
+use crate::utils::prompt_password;
 use alloy::network::EthereumWallet;
 use alloy::primitives::Address;
 use alloy::providers::{Provider, ProviderBuilder, WsConnect};
 use alloy::signers::local::LocalSigner;
 use futures_util::StreamExt;
-use rpassword::read_password;
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -28,12 +28,19 @@ impl Distributor {
         password: Option<String>,
         fallback_delay: Option<Duration>,
     ) -> eyre::Result<Self> {
+        let cfg = get_config();
         let password = match password {
             Some(pwd) => pwd,
             None => {
-                print!("Enter keystore password: ");
-                std::io::stdout().flush()?;
-                read_password()?
+                if let Some(cfg_pwd) = cfg.keystore_password.clone() {
+                    if LocalSigner::decrypt_keystore(&keystore, &cfg_pwd).is_ok() {
+                        cfg_pwd
+                    } else {
+                        prompt_password()?
+                    }
+                } else {
+                    prompt_password()?
+                }
             }
         };
         let signer = LocalSigner::decrypt_keystore(keystore, password)?;

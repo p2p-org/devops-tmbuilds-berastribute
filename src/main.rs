@@ -13,6 +13,7 @@ mod contract;
 mod distribute;
 mod distributor;
 mod types;
+mod utils;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
