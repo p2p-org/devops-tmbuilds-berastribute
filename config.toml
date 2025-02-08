@@ -1,3 +1,5 @@
+### intervals are specified in milliseconds
+
 chain_id = 80094
 
 ## EL config
@@ -7,3 +9,5 @@ block_poll_interval = 100
 ## CL proof config
 beacon_poll_interval = 50
 beacon_max_retries = 12
+
+fallback_wait_interval = 30000 ## only applicable when fallback-mode is enabled

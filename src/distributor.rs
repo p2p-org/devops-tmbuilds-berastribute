@@ -10,11 +10,13 @@ use rpassword::read_password;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 pub struct Distributor {
     fee_recipient: Option<Address>,
     provider: Arc<MyProvider>,
     beacon_api: Arc<BeaconApi>,
+    fallback_delay: Option<Duration>,
 }
 
 impl Distributor {
@@ -24,6 +26,7 @@ impl Distributor {
         beacon_url: String,
         keystore: PathBuf,
         password: Option<String>,
+        fallback_delay: Option<Duration>,
     ) -> eyre::Result<Self> {
         let password = match password {
             Some(pwd) => pwd,
@@ -40,7 +43,7 @@ impl Distributor {
             ProviderBuilder::new().with_recommended_fillers().wallet(wallet).on_ws(ws).await?,
         );
         let beacon_api = Arc::new(BeaconApi::new(beacon_url));
-        Ok(Self { fee_recipient, provider, beacon_api })
+        Ok(Self { fee_recipient, provider, beacon_api, fallback_delay })
     }
 
     pub async fn run(&self) -> eyre::Result<()> {
@@ -50,6 +53,7 @@ impl Distributor {
         let provider = self.provider.clone();
         let fee_recipient = self.fee_recipient;
         let ba = self.beacon_api.clone();
+        let fallback_delay = self.fallback_delay.clone();
         tracing::info!(?fee_recipient, "Starting distributor");
 
         let handle = tokio::spawn(async move {
@@ -64,6 +68,7 @@ impl Distributor {
                         provider.clone(),
                         ba.clone(),
                         header.number + 1,
+                        fallback_delay,
                     ));
                 }
             }

@@ -12,5 +12,6 @@ sol! {
             bytes32[] calldata pubkeyProof
         );
 
+        function isTimestampActionable(uint64 timestamp) external view returns (bool actionable);
     }
 }

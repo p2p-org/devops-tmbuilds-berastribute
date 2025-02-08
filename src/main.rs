@@ -22,12 +22,28 @@ async fn main() -> eyre::Result<()> {
         .with_span_events(FmtSpan::NONE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-    let _ = get_config(); // validates config
+    let cfg = get_config();
 
     match App::parse().command {
-        Command::Distributor { fee_recipient, wss_url, beacon_url, keystore, password } => {
-            let ds =
-                Distributor::new(fee_recipient, wss_url, beacon_url, keystore, password).await?;
+        Command::Distributor {
+            fee_recipient,
+            wss_url,
+            beacon_url,
+            keystore,
+            password,
+            fallback_mode,
+        } => {
+            let fallback_delay =
+                if fallback_mode { Some(cfg.fallback_wait_interval) } else { None };
+            let ds = Distributor::new(
+                fee_recipient,
+                wss_url,
+                beacon_url,
+                keystore,
+                password,
+                fallback_delay,
+            )
+            .await?;
             ds.run().await?;
         }
         Command::Beacon { beacon_url, timestamp } => {

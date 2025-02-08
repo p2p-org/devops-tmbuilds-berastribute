@@ -10,7 +10,7 @@ const DEFAULT_BLOCK_POLL_INTERVAL: u64 = 250;
 
 const DEFAULT_BEACON_POLL_INTERVAL: u64 = 250;
 const DEFAULT_BEACON_MAX_RETRIES: usize = 12;
-
+const DEFAULT_FALLBACK_WAIT_INTERVAL: u64 = 30000;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -19,6 +19,7 @@ pub struct Config {
     pub block_poll_interval: Duration,
     pub beacon_poll_interval: Duration,
     pub beacon_max_retries: usize,
+    pub fallback_wait_interval: Duration,
 }
 
 fn build_config() -> eyre::Result<Config> {
@@ -32,10 +33,19 @@ fn build_config() -> eyre::Result<Config> {
     );
     let beacon_max_retries =
         cfg.get::<usize>("beacon_max_retries").unwrap_or(DEFAULT_BEACON_MAX_RETRIES);
-    let chain_id =
-        cfg.get::<u64>("chain_id").unwrap_or(DEFAULT_CHAIN_ID);
+    let fallback_wait_interval = Duration::from_millis(
+        cfg.get::<u64>("fallback_wait_interval").unwrap_or(DEFAULT_FALLBACK_WAIT_INTERVAL),
+    );
+    let chain_id = cfg.get::<u64>("chain_id").unwrap_or(DEFAULT_CHAIN_ID);
 
-    Ok(Config { distributor, block_poll_interval, beacon_poll_interval, beacon_max_retries, chain_id })
+    Ok(Config {
+        chain_id,
+        distributor,
+        block_poll_interval,
+        beacon_poll_interval,
+        beacon_max_retries,
+        fallback_wait_interval,
+    })
 }
 
 lazy_static! {

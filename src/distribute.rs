@@ -6,12 +6,14 @@ use alloy::network::primitives::BlockTransactionsKind;
 use alloy::primitives::TxHash;
 use alloy::providers::Provider;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::time::sleep;
 
 pub async fn poll_proof_and_distribute(
     provider: Arc<MyProvider>,
     beacon_api: Arc<BeaconApi>,
     block_number: u64,
+    fallback_delay: Option<Duration>,
 ) {
     let cfg = get_config();
     let target = block_number.into();
@@ -25,11 +27,33 @@ pub async fn poll_proof_and_distribute(
     let ts = next_block.header.timestamp;
     match beacon_api.get_block_proposer_with_retry(ts).await {
         Ok(resp) => {
-            let result = distribute(provider, resp, ts).await;
-            tracing::info!(?result, "Submitted tx");
+            if wait_and_fallback(provider.clone(), ts, fallback_delay).await {
+                let result = distribute(provider, resp, ts).await;
+                tracing::info!(?result, "Submitted tx");
+            } else {
+                tracing::info!(?ts, "timestamp not actionable (already distributed)");
+            }
         }
         Err(err) => {
             tracing::error!(?err, "error fetching block proposer data");
+        }
+    }
+}
+
+async fn wait_and_fallback(provider: Arc<MyProvider>, ts: u64, delay: Option<Duration>) -> bool {
+    let Some(delay) = delay else {
+        return true;
+    };
+    sleep(delay).await;
+    match DistributorContractInstance::new(get_config().distributor, provider)
+        .isTimestampActionable(ts)
+        .call()
+        .await
+    {
+        Ok(result) => result.actionable,
+        Err(err) => {
+            tracing::error!(?ts, ?err, "error checking distributor.isTimestampActionable()");
+            true // still attempt to distribute if read err
         }
     }
 }

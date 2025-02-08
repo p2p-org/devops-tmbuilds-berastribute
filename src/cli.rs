@@ -20,6 +20,9 @@ pub enum Command {
 
         #[arg(short, long)]
         password: Option<String>,
+
+        #[arg(short, long, help = "wait for fdn to distribute. only distribute if they dont")]
+        fallback_mode: bool,
     },
 
     /// Check beacon response
