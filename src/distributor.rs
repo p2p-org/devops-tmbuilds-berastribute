@@ -3,11 +3,14 @@ use crate::config::get_config;
 use crate::distribute::poll_proof_and_distribute;
 use crate::types::MyProvider;
 use crate::utils::prompt_password;
+use alloy::network::primitives::BlockTransactionsKind::Hashes;
 use alloy::network::EthereumWallet;
 use alloy::primitives::Address;
 use alloy::providers::{Provider, ProviderBuilder, WsConnect};
+use alloy::rpc::types::Header;
 use alloy::signers::local::LocalSigner;
 use futures_util::StreamExt;
+use indicatif::ProgressBar;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -53,6 +56,31 @@ impl Distributor {
         Ok(Self { fee_recipient, provider, beacon_api, fallback_delay })
     }
 
+    pub async fn run_backfill(&self, blocks: u64) -> eyre::Result<()> {
+        tracing::info!(fee_recipient=?self.fee_recipient, "Starting backfill distributor");
+        let current_bn = self.provider.get_block_number().await?;
+        let start = current_bn - blocks + 1;
+        tracing::info!(?start, end=?current_bn, "Target range");
+
+        let bar = ProgressBar::new(blocks);
+        for bn in start..=current_bn {
+            if let Some(block) = self.provider.get_block(bn.into(), Hashes).await? {
+                if check_if_target(&block.header, self.fee_recipient) {
+                    poll_proof_and_distribute(
+                        self.provider.clone(),
+                        self.beacon_api.clone(),
+                        block.header.number + 1,
+                        Some(Duration::from_secs(0)), // force is_actionable check
+                    )
+                    .await;
+                }
+            }
+            bar.inc(1);
+        }
+        bar.finish();
+        Ok(())
+    }
+
     pub async fn run(&self) -> eyre::Result<()> {
         let sub = self.provider.subscribe_blocks().await?;
         let mut stream = sub.into_stream();
@@ -65,10 +93,7 @@ impl Distributor {
 
         let handle = tokio::spawn(async move {
             while let Some(header) = stream.next().await {
-                let should_distribute = match fee_recipient {
-                    None => true,
-                    Some(addr) => addr == header.beneficiary,
-                };
+                let should_distribute = check_if_target(&header, fee_recipient);
                 tracing::info!(bn=?header.number, fee_recipient=?header.beneficiary, ?should_distribute, "Received block");
                 if should_distribute {
                     tokio::spawn(poll_proof_and_distribute(
@@ -84,5 +109,12 @@ impl Distributor {
         handle.await?;
 
         Ok(())
+    }
+}
+
+fn check_if_target(header: &Header, fee_recipient: Option<Address>) -> bool {
+    match fee_recipient {
+        None => true,
+        Some(addr) => addr == header.beneficiary,
     }
 }

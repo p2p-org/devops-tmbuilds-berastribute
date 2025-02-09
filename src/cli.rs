@@ -21,6 +21,9 @@ pub enum Command {
         #[arg(short, long)]
         password: Option<String>,
 
+        #[arg(long, help = "number of blocks to backfill. runs and terminates if set")]
+        backfill_blocks: Option<u64>,
+
         #[arg(long, help = "wait for fdn to distribute. only distribute if they dont")]
         fallback_mode: bool,
     },

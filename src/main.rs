@@ -32,10 +32,14 @@ async fn main() -> eyre::Result<()> {
             beacon_url,
             keystore,
             password,
+            backfill_blocks,
             fallback_mode,
         } => {
-            let fallback_delay =
-                if fallback_mode { Some(cfg.fallback_wait_interval) } else { None };
+            let fallback_delay = if fallback_mode && backfill_blocks.is_none() {
+                Some(cfg.fallback_wait_interval)
+            } else {
+                None
+            };
             let ds = Distributor::new(
                 fee_recipient,
                 wss_url,
@@ -45,7 +49,11 @@ async fn main() -> eyre::Result<()> {
                 fallback_delay,
             )
             .await?;
-            ds.run().await?;
+            if let Some(backfill_blocks) = backfill_blocks {
+                ds.run_backfill(backfill_blocks).await?;
+            } else {
+                ds.run().await?;
+            }
         }
         Command::Beacon { beacon_url, timestamp } => {
             let beacon_api = BeaconApi::new(beacon_url);
