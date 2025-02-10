@@ -80,5 +80,5 @@ async fn distribute(
         .gas(1000000)
         .send()
         .await?;
-    Ok(tx_hash.tx_hash().clone())
+    Ok(*tx_hash.tx_hash())
 }

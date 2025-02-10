@@ -88,7 +88,7 @@ impl Distributor {
         let provider = self.provider.clone();
         let fee_recipient = self.fee_recipient;
         let ba = self.beacon_api.clone();
-        let fallback_delay = self.fallback_delay.clone();
+        let fallback_delay = self.fallback_delay;
         tracing::info!(?fee_recipient, "Starting distributor");
 
         let handle = tokio::spawn(async move {
