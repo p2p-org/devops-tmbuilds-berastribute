@@ -8,7 +8,7 @@ This utility helps to accomplish that task
 ### Usage
 
 ```shell
-git clonne https://github.com/datskos/berastribute
+git clone https://github.com/datskos/berastribute
 cargo build --release
 ```
 
