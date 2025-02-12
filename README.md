@@ -48,6 +48,10 @@ the `fallback_wait_interval` key in config.toml). After 30s, it checks if the bl
 only calls distribute if still actionable. The reasoning here is that another party may call `distributeFor` on your
 behalf so with this you can wait until that potentially happens.
 
+### License
+
+berastribute is licensed under the Apache and MIT licenses
+
 ### Disclaimer
 
 *This code is being provided as is. No guarantee, representation or warranty is being made, express or implied, as to
