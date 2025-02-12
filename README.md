@@ -9,6 +9,7 @@ This utility helps to accomplish that task
 
 ```shell
 git clone https://github.com/datskos/berastribute
+cd berastribute
 cargo build --release
 ```
 
@@ -55,8 +56,7 @@ berastribute is licensed under the Apache and MIT licenses
 ### Disclaimer
 
 *This code is being provided as is. No guarantee, representation or warranty is being made, express or implied, as to
-the
-safety or correctness of the code. It has not been audited and as such there can be no assurance it will work as
+the safety or correctness of the code. It has not been audited and as such there can be no assurance it will work as
 intended, and users may experience delays, failures, errors, omissions or loss of transmitted information. Nothing in
 this repo should be construed as investment advice or legal advice for any particular facts or circumstances and is not
 meant to replace competent counsel. It is strongly advised for you to contact a reputable attorney in your jurisdiction
