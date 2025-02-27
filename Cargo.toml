@@ -6,6 +6,8 @@ edition = "2021"
 [dependencies]
 alloy = { version = "0.9.2", features = ["full", "signer-keystore", "sol-types", "contract"] }
 tokio = { version = "1.43.0", features = ["rt-multi-thread"] }
+prometheus = "0.13"
+warp = "0.3"
 
 ## misc
 clap = { version = "4.5.26", features = ["derive"] }

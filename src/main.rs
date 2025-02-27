@@ -12,6 +12,7 @@ mod config;
 mod contract;
 mod distribute;
 mod distributor;
+mod metrics;
 mod types;
 mod utils;
 
@@ -24,6 +25,9 @@ async fn main() -> eyre::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     let cfg = get_config();
+
+    // Initialize metrics endpoint
+    metrics::init_metrics().await;
 
     match App::parse().command {
         Command::Distributor {
@@ -56,7 +60,8 @@ async fn main() -> eyre::Result<()> {
             }
         }
         Command::Beacon { beacon_url, timestamp } => {
-            let beacon_api = BeaconApi::new(beacon_url);
+            let beacon_api =
+                BeaconApi::new(beacon_url, cfg.beacon_max_retries, cfg.beacon_poll_interval);
             let result = beacon_api.get_block_proposer(timestamp).await?;
             println!("{:#?}", result);
         }

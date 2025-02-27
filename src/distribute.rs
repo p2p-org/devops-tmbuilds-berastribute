@@ -1,12 +1,15 @@
 use crate::beacon_api::BeaconApi;
 use crate::config::get_config;
 use crate::contract::DistributorContract::DistributorContractInstance;
+use crate::metrics::{
+    BEACON_API_ERRORS, CONTRACT_CALLS, DISTRIBUTION_ATTEMPTS, DISTRIBUTION_DURATION, GAS_USED,
+};
 use crate::types::{BlockProposerResponse, MyProvider};
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::primitives::TxHash;
 use alloy::providers::Provider;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
 pub async fn poll_proof_and_distribute(
@@ -28,13 +31,23 @@ pub async fn poll_proof_and_distribute(
     match beacon_api.get_block_proposer_with_retry(ts).await {
         Ok(resp) => {
             if wait_and_fallback(provider.clone(), ts, fallback_delay).await {
-                let result = distribute(provider, resp, ts).await;
-                tracing::info!(?result, "Submitted tx");
+                match distribute(provider, resp, ts).await {
+                    Ok(hash) => {
+                        DISTRIBUTION_ATTEMPTS.with_label_values(&["success"]).inc();
+                        tracing::info!(?hash, "Submitted tx");
+                    }
+                    Err(e) => {
+                        DISTRIBUTION_ATTEMPTS.with_label_values(&["failure"]).inc();
+                        tracing::error!(?e, "Failed to distribute");
+                    }
+                }
             } else {
+                DISTRIBUTION_ATTEMPTS.with_label_values(&["skipped"]).inc();
                 tracing::info!(?ts, "timestamp not actionable (already distributed)");
             }
         }
         Err(err) => {
+            BEACON_API_ERRORS.with_label_values(&["proposer_fetch"]).inc();
             tracing::error!(?err, "error fetching block proposer data");
         }
     }
@@ -50,8 +63,12 @@ async fn wait_and_fallback(provider: Arc<MyProvider>, ts: u64, delay: Option<Dur
         .call()
         .await
     {
-        Ok(result) => result.actionable,
+        Ok(result) => {
+            CONTRACT_CALLS.with_label_values(&["isTimestampActionable", "success"]).inc();
+            result.actionable
+        }
         Err(err) => {
+            CONTRACT_CALLS.with_label_values(&["isTimestampActionable", "failure"]).inc();
             tracing::error!(?ts, ?err, "error checking distributor.isTimestampActionable()");
             true // still attempt to distribute if read err
         }
@@ -63,12 +80,14 @@ async fn distribute(
     resp: BlockProposerResponse,
     ts: u64,
 ) -> eyre::Result<TxHash> {
+    let start_time = Instant::now();
     let cfg = get_config();
-    let contract = DistributorContractInstance::new(cfg.distributor, provider);
+    let contract = DistributorContractInstance::new(cfg.distributor, provider.clone());
     let proposer_index =
         u64::from_str_radix(resp.beacon_block_header.proposer_index.trim_start_matches("0x"), 16)?;
     tracing::info!(?ts, "Submitting");
-    let tx_hash = contract
+
+    let result = contract
         .distributeFor(
             ts,
             proposer_index,
@@ -79,6 +98,25 @@ async fn distribute(
         .chain_id(cfg.chain_id)
         .gas(1000000)
         .send()
-        .await?;
-    Ok(*tx_hash.tx_hash())
+        .await;
+
+    let duration = start_time.elapsed().as_secs_f64();
+    match result {
+        Ok(tx_hash) => {
+            DISTRIBUTION_DURATION.with_label_values(&["success"]).observe(duration);
+            CONTRACT_CALLS.with_label_values(&["distributeFor", "success"]).inc();
+
+            // Wait for transaction receipt to get gas used
+            if let Ok(Some(receipt)) = provider.get_transaction_receipt(*tx_hash.tx_hash()).await {
+                GAS_USED.observe(receipt.gas_used as f64);
+            }
+
+            Ok(*tx_hash.tx_hash())
+        }
+        Err(e) => {
+            DISTRIBUTION_DURATION.with_label_values(&["failure"]).observe(duration);
+            CONTRACT_CALLS.with_label_values(&["distributeFor", "failure"]).inc();
+            Err(e.into())
+        }
+    }
 }
