@@ -11,6 +11,7 @@ const DEFAULT_BLOCK_POLL_INTERVAL: u64 = 250;
 const DEFAULT_BEACON_POLL_INTERVAL: u64 = 250;
 const DEFAULT_BEACON_MAX_RETRIES: usize = 12;
 const DEFAULT_FALLBACK_WAIT_INTERVAL: u64 = 30000;
+const DEFAULT_METRICS_PORT: u16 = 11111;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -21,6 +22,7 @@ pub struct Config {
     pub beacon_max_retries: usize,
     pub fallback_wait_interval: Duration,
     pub keystore_password: Option<String>,
+    pub metrics_port: u16,
 }
 
 fn build_config() -> eyre::Result<Config> {
@@ -39,6 +41,7 @@ fn build_config() -> eyre::Result<Config> {
     );
     let chain_id = cfg.get::<u64>("chain_id").unwrap_or(DEFAULT_CHAIN_ID);
     let keystore_password = cfg.get::<Option<String>>("keystore_password").unwrap_or(None);
+    let metrics_port = cfg.get::<u16>("metrics_port").unwrap_or(DEFAULT_METRICS_PORT);
 
     Ok(Config {
         chain_id,
@@ -48,6 +51,7 @@ fn build_config() -> eyre::Result<Config> {
         beacon_max_retries,
         fallback_wait_interval,
         keystore_password,
+        metrics_port,
     })
 }
 

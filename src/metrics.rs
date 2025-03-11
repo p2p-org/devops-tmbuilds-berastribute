@@ -1,9 +1,11 @@
+use crate::config::get_config;
 use lazy_static::lazy_static;
 use prometheus::{
     register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
     register_int_gauge, Encoder, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
     TextEncoder,
 };
+use std::net::SocketAddr;
 use warp::Filter;
 
 lazy_static! {
@@ -102,6 +104,9 @@ lazy_static! {
 }
 
 pub async fn init_metrics() {
+    let cfg = get_config();
+    let addr = SocketAddr::from(([0, 0, 0, 0], cfg.metrics_port));
+
     let metrics_route = warp::path!("metrics").map(|| {
         let encoder = TextEncoder::new();
         let metric_families = prometheus::gather();
@@ -110,6 +115,9 @@ pub async fn init_metrics() {
         String::from_utf8(buffer).unwrap()
     });
 
-    tokio::spawn(warp::serve(metrics_route).run(([0, 0, 0, 0], 11111)));
-    tracing::info!("Metrics server started on :11111");
+    tokio::spawn(async move {
+        warp::serve(metrics_route).run(addr).await;
+    });
+
+    tracing::info!("Metrics server started on {}", addr);
 }
