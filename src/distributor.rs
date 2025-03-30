@@ -1,6 +1,7 @@
 use crate::beacon_api::BeaconApi;
 use crate::config::get_config;
 use crate::distribute::poll_proof_and_distribute;
+use crate::healthcheck::ping_healthcheck;
 use crate::types::MyProvider;
 use crate::utils::prompt_password;
 use alloy::network::primitives::BlockTransactionsKind::Hashes;
@@ -64,6 +65,11 @@ impl Distributor {
 
         let bar = ProgressBar::new(blocks);
         for bn in start..=current_bn {
+            let healthcheck_id = get_config().healthcheck_id.clone();
+            tokio::spawn(async move {
+                ping_healthcheck(healthcheck_id.as_deref()).await;
+            });
+
             if let Some(block) = self.provider.get_block(bn.into(), Hashes).await? {
                 if check_if_target(&block.header, self.fee_recipient) {
                     poll_proof_and_distribute(
@@ -93,6 +99,11 @@ impl Distributor {
 
         let handle = tokio::spawn(async move {
             while let Some(header) = stream.next().await {
+                let healthcheck_id = get_config().healthcheck_id.clone();
+                tokio::spawn(async move {
+                    ping_healthcheck(healthcheck_id.as_deref()).await;
+                });
+
                 let should_distribute = check_if_target(&header, fee_recipient);
                 tracing::info!(bn=?header.number, fee_recipient=?header.beneficiary, ?should_distribute, "Received block");
                 if should_distribute {
@@ -107,7 +118,6 @@ impl Distributor {
         });
 
         handle.await?;
-
         Ok(())
     }
 }
