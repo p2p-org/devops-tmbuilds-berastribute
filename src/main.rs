@@ -14,6 +14,7 @@ mod distribute;
 mod distributor;
 mod types;
 mod utils;
+mod healthcheck;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
