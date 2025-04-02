@@ -1,6 +1,7 @@
 use crate::beacon_api::BeaconApi;
 use crate::config::get_config;
 use crate::distribute::poll_proof_and_distribute;
+use crate::metrics::{BLOCKS_PROCESSED, BLOCKS_SKIPPED, LATEST_BLOCK_NUMBER};
 use crate::types::MyProvider;
 use crate::utils::prompt_password;
 use alloy::network::primitives::BlockTransactionsKind::Hashes;
@@ -52,7 +53,8 @@ impl Distributor {
         let provider = Arc::new(
             ProviderBuilder::new().with_recommended_fillers().wallet(wallet).on_ws(ws).await?,
         );
-        let beacon_api = Arc::new(BeaconApi::new(beacon_url));
+        let beacon_api =
+            Arc::new(BeaconApi::new(beacon_url, cfg.beacon_max_retries, cfg.beacon_poll_interval));
         Ok(Self { fee_recipient, provider, beacon_api, fallback_delay })
     }
 
@@ -93,7 +95,14 @@ impl Distributor {
 
         let handle = tokio::spawn(async move {
             while let Some(header) = stream.next().await {
+                LATEST_BLOCK_NUMBER.set(header.number as i64);
+                BLOCKS_PROCESSED.inc();
+
                 let should_distribute = check_if_target(&header, fee_recipient);
+                if !should_distribute {
+                    BLOCKS_SKIPPED.inc();
+                }
+
                 tracing::info!(bn=?header.number, fee_recipient=?header.beneficiary, ?should_distribute, "Received block");
                 if should_distribute {
                     tokio::spawn(poll_proof_and_distribute(
