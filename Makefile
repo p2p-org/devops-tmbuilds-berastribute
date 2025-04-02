@@ -3,8 +3,8 @@ BUILD ?= .build
 BALLS ?= .balls
 TGTS ?= \
 	x86_64-unknown-linux-gnu
-TAG ?= v0.6.0
-VER ?= v0_6_0
+TAG ?= v0.6.1
+VER ?= v0_6_1
 REL_NAME_PREFIX ?= $(BINARY)
 REL_NAME_SUFFIX ?=
 REL_DESC ?= automatic release from Makefile
