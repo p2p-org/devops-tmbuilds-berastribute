@@ -13,3 +13,5 @@ beacon_max_retries = 12
 fallback_wait_interval = 30000 ## only applicable when fallback-mode is enabled
 
 keystore_password = "" ## will prompt if not specified here
+
+healthcheck_id = "" ## ID from healthchecks.io
