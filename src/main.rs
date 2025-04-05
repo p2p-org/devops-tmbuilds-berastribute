@@ -12,9 +12,9 @@ mod config;
 mod contract;
 mod distribute;
 mod distributor;
+mod healthcheck;
 mod types;
 mod utils;
-mod healthcheck;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
