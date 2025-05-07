@@ -12,6 +12,7 @@ mod config;
 mod contract;
 mod distribute;
 mod distributor;
+mod healthcheck;
 mod types;
 mod utils;
 
