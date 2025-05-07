@@ -1,0 +1,11 @@
+{
+    "name": "berastribute",
+    "version": "0.0.0",
+    "private": true,
+    "devDependencies": {
+        "@semantic-release/commit-analyzer": "^11.0.0",
+        "@semantic-release/github": "^10.0.0",
+        "@semantic-release/release-notes-generator": "^11.0.0",
+        "semantic-release": "^23.0.0"
+    }
+}

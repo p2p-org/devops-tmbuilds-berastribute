@@ -1,56 +1,99 @@
----
-    name: release builder
+name: Build and Tag
 
-    on:
-      push:
-        tags:
-          - "v*"
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
 
-    jobs:
-      release:
-        name: build and release
-        runs-on: ubuntu-20.04
-        steps:
-          - name: install pixz
-            run: sudo apt-get install -y pixz
+env:
+  BINARY_NAME: berastribute
+  TARGET: x86_64-unknown-linux-gnu
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-          - name: checkout the repos
-            uses: actions/checkout@v4
-            with:
-              fetch-depth: 0
-              fetch-tags: true
-              submodules: recursive
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pixz
 
-          - name: install golang
-            uses: actions/setup-go@v5
-            with:
-              go-version: "1.22"
-              check-latest: true
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          submodules: recursive
 
-          - name: install rust
-            uses: actions-rs/toolchain@v1
-            with:
-              toolchain: stable
-              target: x86_64-unknown-linux-gnu
-              override: true
-              profile: minimal
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ env.TARGET }}
+          override: true
+          profile: minimal
 
-          - name: Set version
-            run: |
-              echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      - name: Build binary
+        run: |
+          cargo build --release --target ${{ env.TARGET }}
+          cp target/${{ env.TARGET }}/release/${{ env.BINARY_NAME }} .
 
-          - name: build binaries and archives
-            run: |
-              make build balls
+      - name: Create archive
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          VERSION=$(npx semantic-release --dry-run --no-ci | grep "The next release version is" | cut -d' ' -f6)
+          VERSION_UNDERSCORE=$(echo $VERSION | sed 's/\./_/g')
+          ARCHIVE_NAME="${BINARY_NAME}-${VERSION_UNDERSCORE}-${TARGET}.txz"
+          tar -Ipixz -cf "${ARCHIVE_NAME}" "${BINARY_NAME}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
 
-          - name: make release and upload archives
-            uses: ncipollo/release-action@v1
-            with:
-              name: "Berastribute ${{ env.VERSION }}"
-              draft: true
-              artifacts: ".balls/*"
-              body: |
-                Berastribute Release ${{ env.VERSION }}
+      - name: Upload artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary
+          path: |
+            ${{ env.ARCHIVE_NAME }}
+            ${{ env.BINARY_NAME }}
 
-                ## Binaries
-                - Linux (amd64)
+  create-tag:
+    name: Create Tag
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Get version
+        id: get_version
+        run: |
+          VERSION=$(npx semantic-release --dry-run --no-ci | grep "The next release version is" | cut -d' ' -f6)
+          if [ -z "$VERSION" ]; then
+            echo "No new version to release"
+            exit 0
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create tag
+        if: steps.get_version.outputs.version != ''
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git tag ${{ steps.get_version.outputs.version }}
+          git push origin ${{ steps.get_version.outputs.version }}
