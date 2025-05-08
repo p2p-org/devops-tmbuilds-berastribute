@@ -7,7 +7,6 @@ use std::time::Duration;
 const DEFAULT_CHAIN_ID: u64 = 80000;
 const DEFAULT_DISTRIBUTOR_ADDRESS: Address = address!("0x211bE45338B7C6d5721B5543Eb868547088Aca39");
 const DEFAULT_BLOCK_POLL_INTERVAL: u64 = 250;
-
 const DEFAULT_BEACON_POLL_INTERVAL: u64 = 250;
 const DEFAULT_BEACON_MAX_RETRIES: usize = 12;
 const DEFAULT_FALLBACK_WAIT_INTERVAL: u64 = 30000;
@@ -21,6 +20,7 @@ pub struct Config {
     pub beacon_max_retries: usize,
     pub fallback_wait_interval: Duration,
     pub keystore_password: Option<String>,
+    pub healthcheck_id: Option<String>,
 }
 
 fn build_config() -> eyre::Result<Config> {
@@ -39,6 +39,7 @@ fn build_config() -> eyre::Result<Config> {
     );
     let chain_id = cfg.get::<u64>("chain_id").unwrap_or(DEFAULT_CHAIN_ID);
     let keystore_password = cfg.get::<Option<String>>("keystore_password").unwrap_or(None);
+    let healthcheck_id = cfg.get::<Option<String>>("healthcheck_id").unwrap_or(None);
 
     Ok(Config {
         chain_id,
@@ -48,6 +49,7 @@ fn build_config() -> eyre::Result<Config> {
         beacon_max_retries,
         fallback_wait_interval,
         keystore_password,
+        healthcheck_id,
     })
 }
 

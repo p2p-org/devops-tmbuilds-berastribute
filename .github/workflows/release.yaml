@@ -1,0 +1,91 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  BINARY_NAME: berastribute
+  TARGET: x86_64-unknown-linux-gnu
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pixz
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          submodules: recursive
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ env.TARGET }}
+          override: true
+          profile: minimal
+
+      - name: Build binary
+        run: |
+          cargo build --release --target ${{ env.TARGET }}
+          cp target/${{ env.TARGET }}/release/${{ env.BINARY_NAME }} .
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Get next version
+        id: version
+        run: |
+          echo "Running semantic-release dry run..."
+          npx semantic-release --dry-run --no-ci > release.log
+          echo "Release log contents:"
+          cat release.log
+          VERSION=$(grep "the next release version is" release.log | awk '{print $NF}')
+          echo "Extracted version: $VERSION"
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not determine next version"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION_UNDERSCORE=$(echo $VERSION | sed 's/\./_/g')" >> $GITHUB_ENV
+
+      - name: Create archive
+        run: |
+          ARCHIVE_NAME="${BINARY_NAME}-v${VERSION_UNDERSCORE}-linux-amd64.txz"
+          BINARY_NAME_IN_ARCHIVE="${BINARY_NAME}-v${VERSION_UNDERSCORE}-linux-amd64"
+          echo "Creating archive: $ARCHIVE_NAME"
+          echo "Binary name in archive: $BINARY_NAME_IN_ARCHIVE"
+          mv ${BINARY_NAME} ${BINARY_NAME_IN_ARCHIVE}
+          tar -Ipixz -cf "${ARCHIVE_NAME}" "${BINARY_NAME_IN_ARCHIVE}"
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
+
+      - name: Verify archive
+        run: |
+          echo "Verifying archive contents:"
+          tar -tvf $ARCHIVE_NAME
+          echo "Archive size:"
+          ls -lh $ARCHIVE_NAME
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release --no-ci

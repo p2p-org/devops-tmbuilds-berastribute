@@ -1,0 +1,17 @@
+{
+  "branches": [
+    "main"
+  ],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          "berastribute-v*_*_*-linux-amd64.txz"
+        ]
+      }
+    ]
+  ]
+}
