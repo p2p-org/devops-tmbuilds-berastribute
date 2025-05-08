@@ -59,7 +59,7 @@ jobs:
           npx semantic-release --dry-run --no-ci > release.log
           echo "Release log contents:"
           cat release.log
-          VERSION=$(grep "the next release version is" release.log | awk '{print $NF}')
+          VERSION=$(grep "The next release version is" release.log | awk '{print $NF}')
           echo "Extracted version: $VERSION"
           if [ -z "$VERSION" ]; then
             echo "Error: Could not determine next version"
