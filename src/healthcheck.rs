@@ -1,8 +1,8 @@
-use healthchecks::ping::get_client;
+use reqwest::Client;
+use std::time::Duration;
 
 /// Sends a ping to healthchecks.io with a success signal
 /// Does nothing if healthcheck_id is not set
-
 pub async fn ping_healthcheck(healthcheck_id: Option<&str>) {
     // If no healthcheck_id is provided, do nothing
     let Some(id) = healthcheck_id else {
@@ -12,30 +12,38 @@ pub async fn ping_healthcheck(healthcheck_id: Option<&str>) {
 
     tracing::debug!("Attempting to ping healthcheck with ID: {}", id);
 
-    // Create the healthchecks client
-    let client = match get_client(id) {
-        Ok(client) => {
-            tracing::debug!("Successfully created healthcheck client");
-            client
-        }
-        Err(e) => {
-            tracing::warn!("Failed to create healthcheck client: {}", e);
-            return;
-        }
-    };
+    // Create a client with timeout and retry settings
+    let client = Client::builder().timeout(Duration::from_secs(10)).build().unwrap_or_else(|e| {
+        tracing::warn!("Failed to create HTTP client: {}", e);
+        Client::new()
+    });
 
-    // Send the ping
-    tracing::debug!("Sending ping to healthcheck...");
-    let success = client.report_success();
-    tracing::debug!("report_success() returned: {}", success);
+    let url = format!("https://hc-ping.com/{}", id);
+    tracing::debug!("Sending ping to: {}", url);
 
-    if success {
-        tracing::debug!("Healthcheck ping sent successfully");
-    } else {
-        tracing::warn!(
-            "Healthcheck ping failed to send. ID: {}, URL: https://hc-ping.com/{}",
-            id,
-            id
-        );
+    // Try up to 5 times
+    for attempt in 1..=5 {
+        match client.get(&url).send().await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    tracing::debug!("Healthcheck ping sent successfully");
+                    return;
+                } else {
+                    tracing::warn!(
+                        "Healthcheck ping failed with status {} (attempt {}/5)",
+                        response.status(),
+                        attempt
+                    );
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Healthcheck ping failed with error: {} (attempt {}/5)", e, attempt);
+            }
+        }
+        if attempt < 5 {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
     }
+
+    tracing::warn!("Healthcheck ping failed after 5 attempts. ID: {}, URL: {}", id, url);
 }
